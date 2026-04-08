@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hand Interaction System</title>
+  <title>Advanced Hand Interaction</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -10,10 +10,7 @@
       object-fit: cover;
       transform: scaleX(-1);
     }
-    canvas {
-      position: absolute;
-      top: 0; left: 0;
-    }
+    canvas { position: absolute; top: 0; left: 0; }
   </style>
 </head>
 
@@ -33,68 +30,58 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let prev = [];
+let prevCenterX = 0;
 let rotation = 0;
 
-// Smooth function
-function lerp(a, b, t) {
-  return a + (b - a) * t;
+// Get point
+function getPoint(hand, i) {
+  return {
+    x: (1 - hand[i].x) * canvas.width,
+    y: hand[i].y * canvas.height
+  };
 }
 
-// Draw clean elastic string
-function drawString(p1, p2) {
-  ctx.beginPath();
-  ctx.moveTo(p1.x, p1.y);
+// Draw multiple strings
+function drawBands(hand1, hand2) {
+  const fingers = [4, 8, 12, 16, 20];
 
-  const cx = (p1.x + p2.x) / 2;
-  const cy = (p1.y + p2.y) / 2;
+  fingers.forEach((f, i) => {
+    const p1 = getPoint(hand1, f);
+    const p2 = getPoint(hand2, f);
 
-  ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
 
-  ctx.strokeStyle = "rgba(0,255,100,0.9)";
-  ctx.lineWidth = 4;
+    const cx = (p1.x + p2.x)/2;
+    const cy = (p1.y + p2.y)/2;
+
+    ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
+
+    ctx.strokeStyle = `rgba(0,255,120,${0.6 + i*0.1})`;
+    ctx.lineWidth = 2 + i;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = "lime";
+
+    ctx.stroke();
+  });
+}
+
+// Draw globe
+function drawGlobe(cx, cy, r) {
+  ctx.strokeStyle = "rgba(0,255,200,0.9)";
+  ctx.lineWidth = 1.2;
   ctx.shadowBlur = 15;
-  ctx.shadowColor = "lime";
-
-  ctx.stroke();
-}
-
-// Draw wireframe globe
-function drawGlobe(centerX, centerY, radius) {
-  ctx.strokeStyle = "rgba(0,255,200,0.8)";
-  ctx.lineWidth = 1.5;
-  ctx.shadowBlur = 20;
   ctx.shadowColor = "cyan";
 
-  for (let i = 0; i < 10; i++) {
-    const angle = i * Math.PI / 10 + rotation;
+  for (let i = 0; i < 12; i++) {
+    const angle = i * Math.PI / 12 + rotation;
 
     ctx.beginPath();
-    ctx.ellipse(
-      centerX,
-      centerY,
-      radius,
-      radius * Math.cos(angle),
-      0,
-      0,
-      Math.PI * 2
-    );
+    ctx.ellipse(cx, cy, r, r * Math.cos(angle), 0, 0, Math.PI * 2);
     ctx.stroke();
-  }
-
-  for (let i = 0; i < 10; i++) {
-    const angle = i * Math.PI / 10 + rotation;
 
     ctx.beginPath();
-    ctx.ellipse(
-      centerX,
-      centerY,
-      radius * Math.cos(angle),
-      radius,
-      0,
-      0,
-      Math.PI * 2
-    );
+    ctx.ellipse(cx, cy, r * Math.cos(angle), r, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
 }
@@ -118,34 +105,23 @@ hands.onResults(results => {
   const hand1 = results.multiHandLandmarks[0];
   const hand2 = results.multiHandLandmarks[1];
 
-  const getPoint = (hand, i) => ({
-    x: (1 - hand[i].x) * canvas.width,
-    y: hand[i].y * canvas.height
-  });
-
-  const p1 = getPoint(hand1, 8); // index finger
+  const p1 = getPoint(hand1, 8);
   const p2 = getPoint(hand2, 8);
 
-  const thumb1 = getPoint(hand1, 4);
-  const thumb2 = getPoint(hand2, 4);
+  const cx = (p1.x + p2.x)/2;
+  const cy = (p1.y + p2.y)/2;
 
   const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
 
-  // MODE SWITCH
-  if (dist > 150) {
-    // STRING MODE
-    drawString(p1, p2);
-    drawString(thumb1, thumb2);
+  // Rotation based on movement
+  let velocity = cx - prevCenterX;
+  rotation += velocity * 0.01;
+  prevCenterX = cx;
+
+  if (dist > 180) {
+    drawBands(hand1, hand2);
   } else {
-    // GLOBE MODE
-    const cx = (p1.x + p2.x) / 2;
-    const cy = (p1.y + p2.y) / 2;
-
-    const radius = dist * 0.8;
-
-    rotation += 0.02 + (p1.x - p2.x) * 0.0001;
-
-    drawGlobe(cx, cy, radius);
+    drawGlobe(cx, cy, dist * 0.9);
   }
 });
 
