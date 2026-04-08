@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Digital Fabric System</title>
+  <title>Minimal Digital Threads</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -31,8 +31,8 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let digits = [];
-let prevPoints = [];
 let shapes = [];
+let prevPoints = {};
 
 // Helper
 function getPoint(hand, i) {
@@ -46,10 +46,10 @@ function getPoint(hand, i) {
 function createDigit(x, y, intensity) {
   digits.push({
     x, y,
-    vx: (Math.random()-0.5)*0.8,
-    vy: (Math.random()-0.5)*0.8,
+    vx: (Math.random()-0.5)*0.6,
+    vy: (Math.random()-0.5)*0.6,
     life: 1,
-    size: 5 + intensity*2,
+    size: 4 + intensity*1.5,
     value: Math.floor(Math.random()*10)
   });
 }
@@ -68,11 +68,11 @@ function drawDigits() {
   digits = digits.filter(d => d.life > 0);
 }
 
-// GEOMETRIC BACKGROUND
+// GEOMETRY
 function createShape(x, y) {
   shapes.push({
     x, y,
-    size: 20 + Math.random()*40,
+    size: 20 + Math.random()*30,
     life: 1,
     type: Math.random()
   });
@@ -85,21 +85,11 @@ function drawShapes() {
     ctx.strokeStyle = `rgba(255,255,255,${s.life * 0.3})`;
     ctx.lineWidth = 1;
 
-    if (s.type < 0.33) {
-      // triangle
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y - s.size);
-      ctx.lineTo(s.x - s.size, s.y + s.size);
-      ctx.lineTo(s.x + s.size, s.y + s.size);
-      ctx.closePath();
-      ctx.stroke();
-    } else if (s.type < 0.66) {
-      // circle
+    if (s.type < 0.5) {
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
       ctx.stroke();
     } else {
-      // lines
       ctx.beginPath();
       ctx.moveTo(s.x - s.size, s.y);
       ctx.lineTo(s.x + s.size, s.y);
@@ -110,38 +100,33 @@ function drawShapes() {
   shapes = shapes.filter(s => s.life > 0);
 }
 
-// CRISSCROSS CONNECTION
-function drawCrisscross(p1, p2, offsetSeed) {
-  const strands = 6;
+// CLEAN CURVED LINE
+function drawLine(p1, p2, i) {
+  const cx = (p1.x + p2.x) / 2;
+  const cy = (p1.y + p2.y) / 2;
 
-  for (let s = 0; s < strands; s++) {
-    ctx.beginPath();
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
 
-    const steps = 20;
+  // subtle curve
+  ctx.quadraticCurveTo(
+    cx + Math.sin(Date.now()*0.002 + i) * 20,
+    cy + Math.cos(Date.now()*0.002 + i) * 20,
+    p2.x,
+    p2.y
+  );
 
-    for (let t = 0; t <= 1; t += 1/steps) {
-      let x = p1.x + (p2.x - p1.x) * t;
-      let y = p1.y + (p2.y - p1.y) * t;
+  const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+  gradient.addColorStop(0, "rgba(255,0,150,0.9)");
+  gradient.addColorStop(0.5, "rgba(150,0,255,0.9)");
+  gradient.addColorStop(1, "rgba(0,150,255,0.9)");
 
-      y += Math.sin(t * Math.PI * 6 + Date.now()*0.006 + s) * 10;
-      x += Math.cos(t * Math.PI * 4 + s + offsetSeed) * 10;
+  ctx.strokeStyle = gradient;
+  ctx.lineWidth = 1.5;
+  ctx.shadowBlur = 10;
+  ctx.shadowColor = "purple";
 
-      if (t === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-
-    const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
-    gradient.addColorStop(0, "rgba(255,0,150,0.8)");
-    gradient.addColorStop(0.5, "rgba(150,0,255,0.8)");
-    gradient.addColorStop(1, "rgba(0,150,255,0.8)");
-
-    ctx.strokeStyle = gradient;
-    ctx.lineWidth = 0.8 + s*0.15;
-    ctx.shadowBlur = 6;
-    ctx.shadowColor = "purple";
-
-    ctx.stroke();
-  }
+  ctx.stroke();
 }
 
 const hands = new Hands({
@@ -166,7 +151,7 @@ hands.onResults(results => {
   const handsData = results.multiHandLandmarks;
   const fingers = [4, 8, 12, 16, 20];
 
-  // MOTION DETECTION
+  // motion detection
   handsData.forEach((hand, hi) => {
     fingers.forEach(f => {
       const p = getPoint(hand, f);
@@ -176,31 +161,30 @@ hands.onResults(results => {
 
       if (speed > 6) {
         if (Math.random() < 0.4) createDigit(p.x, p.y, speed*0.05);
-        if (Math.random() < 0.1) createShape(p.x, p.y);
+        if (Math.random() < 0.08) createShape(p.x, p.y);
       }
 
       prevPoints[hi+"_"+f] = p;
     });
   });
 
-  // CRISSCROSS mapping (DIFFERENT fingers)
+  // CRISSCROSS mapping
   if (handsData.length >= 2) {
     const hand1 = handsData[0];
     const hand2 = handsData[1];
 
     const mapping = [
-      [4,12],  // thumb → middle
-      [8,16],  // index → ring
-      [12,20], // middle → pinky
-      [16,8],  // ring → index
-      [20,4]   // pinky → thumb
+      [4,12],
+      [8,16],
+      [12,20],
+      [16,8],
+      [20,4]
     ];
 
     mapping.forEach((pair, i) => {
       const p1 = getPoint(hand1, pair[0]);
       const p2 = getPoint(hand2, pair[1]);
-
-      drawCrisscross(p1, p2, i);
+      drawLine(p1, p2, i);
     });
   }
 });
