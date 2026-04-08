@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Digital Silk Interaction</title>
+  <title>Digital Silk - Crisscross</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -31,6 +31,7 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let digits = [];
+let prevPoints = {};
 
 // Helper
 function getPoint(hand, i) {
@@ -40,72 +41,67 @@ function getPoint(hand, i) {
   };
 }
 
-// Create digit particles
-function createDigit(x, y) {
+// Digit particles
+function createDigit(x, y, intensity) {
   digits.push({
     x, y,
-    vx: (Math.random() - 0.5) * 1,
-    vy: (Math.random() - 0.5) * 1,
+    vx: (Math.random()-0.5) * 0.8,
+    vy: (Math.random()-0.5) * 0.8,
     life: 1,
-    value: Math.floor(Math.random() * 10)
+    size: 6 + intensity * 4,
+    value: Math.floor(Math.random()*10)
   });
 }
 
-// Draw digits
 function drawDigits() {
   digits.forEach(d => {
     d.x += d.vx;
     d.y += d.vy;
-    d.life -= 0.01;
+    d.life -= 0.015;
 
     ctx.fillStyle = `rgba(255,255,255,${d.life})`;
-    ctx.font = "10px monospace";
+    ctx.font = `${d.size}px monospace`;
     ctx.fillText(d.value, d.x, d.y);
   });
 
   digits = digits.filter(d => d.life > 0);
 }
 
-// Wavy multi-strings
-function drawMultiWave(p1, p2, fingerIndex) {
-  const strands = 5;
+// CRISSCROSS strings
+function drawCrisscross(p1, p2, index) {
+  const strands = 6;
 
   for (let s = 0; s < strands; s++) {
-
     ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
 
-    const steps = 25;
+    const offset = (s - strands/2) * 5;
+
+    const steps = 20;
 
     for (let t = 0; t <= 1; t += 1/steps) {
       let x = p1.x + (p2.x - p1.x) * t;
       let y = p1.y + (p2.y - p1.y) * t;
 
-      // layered wave offsets
-      y += Math.sin(t * Math.PI * 4 + Date.now()*0.005 + s) * (8 + s*2);
+      // cross wave
+      y += Math.sin(t * Math.PI * 6 + Date.now()*0.006 + s) * 10;
+      x += Math.cos(t * Math.PI * 4 + s) * offset;
 
-      ctx.lineTo(x, y);
+      if (t === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
     }
 
-    // gradient colors (pink → purple → blue)
+    // gradient
     const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
     gradient.addColorStop(0, "rgba(255,0,150,0.8)");
     gradient.addColorStop(0.5, "rgba(150,0,255,0.8)");
     gradient.addColorStop(1, "rgba(0,150,255,0.8)");
 
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 1 + s * 0.2;
-    ctx.shadowBlur = 8;
+    ctx.lineWidth = 0.8 + s * 0.15;
+    ctx.shadowBlur = 6;
     ctx.shadowColor = "purple";
 
     ctx.stroke();
-
-    // create digit particles along strands
-    if (Math.random() < 0.3) {
-      const mx = (p1.x + p2.x)/2 + (Math.random()-0.5)*30;
-      const my = (p1.y + p2.y)/2 + (Math.random()-0.5)*30;
-      createDigit(mx, my);
-    }
   }
 }
 
@@ -124,19 +120,43 @@ hands.onResults(results => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawDigits();
 
-  if (!results.multiHandLandmarks || results.multiHandLandmarks.length < 2) return;
+  if (!results.multiHandLandmarks) return;
 
-  const hand1 = results.multiHandLandmarks[0];
-  const hand2 = results.multiHandLandmarks[1];
-
+  const handsData = results.multiHandLandmarks;
   const fingers = [4, 8, 12, 16, 20];
 
-  fingers.forEach((f, i) => {
-    const p1 = getPoint(hand1, f);
-    const p2 = getPoint(hand2, f);
+  handsData.forEach((hand, hIndex) => {
 
-    drawMultiWave(p1, p2, i);
+    fingers.forEach((f, i) => {
+      const p = getPoint(hand, f);
+
+      // velocity detection
+      const key = hIndex + "_" + f;
+      let prev = prevPoints[key] || p;
+
+      let dx = p.x - prev.x;
+      let dy = p.y - prev.y;
+
+      let speed = Math.sqrt(dx*dx + dy*dy);
+
+      // create digits on high motion
+      if (speed > 8 && Math.random() < 0.5) {
+        createDigit(p.x, p.y, speed * 0.05);
+      }
+
+      prevPoints[key] = p;
+    });
   });
+
+  // Draw connections if 2 hands
+  if (handsData.length >= 2) {
+    const hand1 = handsData[0];
+    const hand2 = handsData[1];
+
+    fingers.forEach((f, i) => {
+      drawCrisscross(getPoint(hand1, f), getPoint(hand2, f), i);
+    });
+  }
 });
 
 const camera = new Camera(video, {
