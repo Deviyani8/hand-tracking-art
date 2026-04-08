@@ -68,13 +68,30 @@ function drawDigits() {
   digits = digits.filter(d => d.life > 0);
 }
 
+// 🔷 POLYGON DRAWER
+function drawPolygon(x, y, sides, size, opacity) {
+  ctx.beginPath();
+  for (let i = 0; i < sides; i++) {
+    const angle = (i / sides) * Math.PI * 2;
+    const px = x + Math.cos(angle) * size;
+    const py = y + Math.sin(angle) * size;
+
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = `rgba(255,255,255,${opacity})`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
 // GEOMETRY
 function createShape(x, y) {
   shapes.push({
     x, y,
-    size: 20 + Math.random()*30,
+    size: 15 + Math.random()*25,
     life: 1,
-    type: Math.random()
+    type: Math.floor(Math.random()*7) // 0–6
   });
 }
 
@@ -82,17 +99,19 @@ function drawShapes() {
   shapes.forEach(s => {
     s.life -= 0.01;
 
-    ctx.strokeStyle = `rgba(255,255,255,${s.life * 0.3})`;
-    ctx.lineWidth = 1;
+    let opacity = s.life * 0.3;
 
-    if (s.type < 0.5) {
+    if (s.type === 0) drawPolygon(s.x, s.y, 3, s.size, opacity); // triangle
+    else if (s.type === 1) drawPolygon(s.x, s.y, 4, s.size, opacity); // square
+    else if (s.type === 2) drawPolygon(s.x, s.y, 5, s.size, opacity); // pentagon
+    else if (s.type === 3) drawPolygon(s.x, s.y, 6, s.size, opacity); // hexagon
+    else if (s.type === 4) drawPolygon(s.x, s.y, 7, s.size, opacity); // heptagon
+    else if (s.type === 5) drawPolygon(s.x, s.y, 8, s.size, opacity); // octagon
+    else {
+      // circle
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
-      ctx.stroke();
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(s.x - s.size, s.y);
-      ctx.lineTo(s.x + s.size, s.y);
+      ctx.strokeStyle = `rgba(255,255,255,${opacity})`;
       ctx.stroke();
     }
   });
@@ -100,7 +119,7 @@ function drawShapes() {
   shapes = shapes.filter(s => s.life > 0);
 }
 
-// CLEAN CURVED LINE
+// LINE
 function drawLine(p1, p2, i) {
   const cx = (p1.x + p2.x) / 2;
   const cy = (p1.y + p2.y) / 2;
@@ -108,7 +127,6 @@ function drawLine(p1, p2, i) {
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
 
-  // subtle curve
   ctx.quadraticCurveTo(
     cx + Math.sin(Date.now()*0.002 + i) * 20,
     cy + Math.cos(Date.now()*0.002 + i) * 20,
@@ -151,7 +169,7 @@ hands.onResults(results => {
   const handsData = results.multiHandLandmarks;
   const fingers = [4, 8, 12, 16, 20];
 
-  // motion detection
+  // motion
   handsData.forEach((hand, hi) => {
     fingers.forEach(f => {
       const p = getPoint(hand, f);
@@ -161,14 +179,14 @@ hands.onResults(results => {
 
       if (speed > 6) {
         if (Math.random() < 0.4) createDigit(p.x, p.y, speed*0.05);
-        if (Math.random() < 0.08) createShape(p.x, p.y);
+        if (Math.random() < 0.1) createShape(p.x, p.y);
       }
 
       prevPoints[hi+"_"+f] = p;
     });
   });
 
-  // CRISSCROSS mapping
+  // crisscross
   if (handsData.length >= 2) {
     const hand1 = handsData[0];
     const hand2 = handsData[1];
