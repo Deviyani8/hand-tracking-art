@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Face Particle Mesh</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: black; }
+    video {
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      transform: scaleX(-1);
+      opacity: 0.15; /* faint face visibility */
+    }
+    canvas { position: absolute; top: 0; left: 0; }
+  </style>
+</head>
+
+<body>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let particles = [];
+
+// Convert face point
+function getPoint(p) {
+  return {
+    x: p.x * canvas.width,
+    y: p.y * canvas.height
+  };
+}
+
+// Create particles
+function createParticles(face) {
+  particles = face.map(p => {
+    const pt = getPoint(p);
+    return {
+      x: pt.x,
+      y: pt.y,
+      baseX: pt.x,
+      baseY: pt.y,
+      vx: 0,
+      vy: 0
+    };
+  });
+}
+
+// Draw particles
+function drawParticles() {
+  particles.forEach(p => {
+    // subtle floating motion
+    p.x += Math.sin(Date.now()*0.002 + p.baseX) * 0.2;
+    p.y += Math.cos(Date.now()*0.002 + p.baseY) * 0.2;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 1.2, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    ctx.fill();
+  });
+}
+
+const faceMesh = new FaceMesh({
+  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+});
+
+faceMesh.setOptions({
+  maxNumFaces: 1,
+  refineLandmarks: true,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
+
+faceMesh.onResults(results => {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!results.multiFaceLandmarks) return;
+
+  const face = results.multiFaceLandmarks[0];
+
+  createParticles(face);
+  drawParticles();
+});
+
+const camera = new Camera(video, {
+  onFrame: async () => {
+    await faceMesh.send({image: video});
+  },
+  width: 1280,
+  height: 720
+});
+
+camera.start();
+</script>
+
+</body>
+</html>
