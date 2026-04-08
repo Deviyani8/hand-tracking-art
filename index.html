@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Artistic Hand Interaction</title>
+  <title>Digital Silk Interaction</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -30,12 +30,7 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let isGlobeMode = false;
-let globeX = 0;
-let globeY = 0;
-let globeSize = 0;
-let rotation = 0;
-let rotationVelocity = 0;
+let digits = [];
 
 // Helper
 function getPoint(hand, i) {
@@ -45,55 +40,72 @@ function getPoint(hand, i) {
   };
 }
 
-// 🌊 Wavy string
-function drawWave(p1, p2, i) {
-  ctx.beginPath();
-  ctx.moveTo(p1.x, p1.y);
-
-  const steps = 20;
-
-  for (let t = 0; t <= 1; t += 1/steps) {
-    let x = p1.x + (p2.x - p1.x) * t;
-    let y = p1.y + (p2.y - p1.y) * t;
-
-    // wave offset
-    y += Math.sin(t * Math.PI * 4 + Date.now()*0.005) * 10;
-
-    ctx.lineTo(x, y);
-  }
-
-  // pink-purple gradient
-  const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
-  gradient.addColorStop(0, "rgba(255,0,150,0.8)");
-  gradient.addColorStop(1, "rgba(150,0,255,0.8)");
-
-  ctx.strokeStyle = gradient;
-  ctx.lineWidth = 1.5 + i * 0.3;
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = "magenta";
-
-  ctx.stroke();
+// Create digit particles
+function createDigit(x, y) {
+  digits.push({
+    x, y,
+    vx: (Math.random() - 0.5) * 1,
+    vy: (Math.random() - 0.5) * 1,
+    life: 1,
+    value: Math.floor(Math.random() * 10)
+  });
 }
 
-// 🌍 Globe
-function drawGlobe() {
-  const r = globeSize;
+// Draw digits
+function drawDigits() {
+  digits.forEach(d => {
+    d.x += d.vx;
+    d.y += d.vy;
+    d.life -= 0.01;
 
-  ctx.strokeStyle = "rgba(200,100,255,0.8)";
-  ctx.lineWidth = 1;
-  ctx.shadowBlur = 20;
-  ctx.shadowColor = "purple";
+    ctx.fillStyle = `rgba(255,255,255,${d.life})`;
+    ctx.font = "10px monospace";
+    ctx.fillText(d.value, d.x, d.y);
+  });
 
-  for (let i = 0; i < 12; i++) {
-    const angle = i * Math.PI / 12 + rotation;
+  digits = digits.filter(d => d.life > 0);
+}
+
+// Wavy multi-strings
+function drawMultiWave(p1, p2, fingerIndex) {
+  const strands = 5;
+
+  for (let s = 0; s < strands; s++) {
 
     ctx.beginPath();
-    ctx.ellipse(globeX, globeY, r, r*Math.cos(angle), 0, 0, Math.PI*2);
+    ctx.moveTo(p1.x, p1.y);
+
+    const steps = 25;
+
+    for (let t = 0; t <= 1; t += 1/steps) {
+      let x = p1.x + (p2.x - p1.x) * t;
+      let y = p1.y + (p2.y - p1.y) * t;
+
+      // layered wave offsets
+      y += Math.sin(t * Math.PI * 4 + Date.now()*0.005 + s) * (8 + s*2);
+
+      ctx.lineTo(x, y);
+    }
+
+    // gradient colors (pink → purple → blue)
+    const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+    gradient.addColorStop(0, "rgba(255,0,150,0.8)");
+    gradient.addColorStop(0.5, "rgba(150,0,255,0.8)");
+    gradient.addColorStop(1, "rgba(0,150,255,0.8)");
+
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 1 + s * 0.2;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = "purple";
+
     ctx.stroke();
 
-    ctx.beginPath();
-    ctx.ellipse(globeX, globeY, r*Math.cos(angle), r, 0, 0, Math.PI*2);
-    ctx.stroke();
+    // create digit particles along strands
+    if (Math.random() < 0.3) {
+      const mx = (p1.x + p2.x)/2 + (Math.random()-0.5)*30;
+      const my = (p1.y + p2.y)/2 + (Math.random()-0.5)*30;
+      createDigit(mx, my);
+    }
   }
 }
 
@@ -110,55 +122,21 @@ hands.setOptions({
 
 hands.onResults(results => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawDigits();
 
-  if (!results.multiHandLandmarks || results.multiHandLandmarks.length < 2) {
-    // keep globe alive even if tracking drops
-    if (isGlobeMode) {
-      rotationVelocity *= 0.95;
-      rotation += rotationVelocity;
-      drawGlobe();
-    }
-    return;
-  }
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length < 2) return;
 
   const hand1 = results.multiHandLandmarks[0];
   const hand2 = results.multiHandLandmarks[1];
 
-  const p1 = getPoint(hand1, 8);
-  const p2 = getPoint(hand2, 8);
+  const fingers = [4, 8, 12, 16, 20];
 
-  const cx = (p1.x + p2.x)/2;
-  const cy = (p1.y + p2.y)/2;
+  fingers.forEach((f, i) => {
+    const p1 = getPoint(hand1, f);
+    const p2 = getPoint(hand2, f);
 
-  const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-
-  // smooth switching
-  if (dist < 140) isGlobeMode = true;
-  if (dist > 200) isGlobeMode = false;
-
-  if (!isGlobeMode) {
-    // 🧵 Strings
-    const fingers = [4, 8, 12, 16, 20];
-
-    fingers.forEach((f, i) => {
-      drawWave(getPoint(hand1, f), getPoint(hand2, f), i);
-    });
-
-  } else {
-    // 🌍 Globe logic
-    globeX = cx;
-    globeY = cy;
-
-    // size reacts to distance
-    globeSize = dist * 1.2;
-
-    // rotation based on hand movement
-    let velocity = (p1.x - p2.x) * 0.002;
-    rotationVelocity = rotationVelocity * 0.9 + velocity;
-    rotation += rotationVelocity;
-
-    drawGlobe();
-  }
+    drawMultiWave(p1, p2, i);
+  });
 });
 
 const camera = new Camera(video, {
