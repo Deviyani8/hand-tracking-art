@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Enhanced Anti-Gravity Interaction</title>
+  <title>Hand Interaction System</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -16,6 +16,7 @@
     }
   </style>
 </head>
+
 <body>
 
 <video id="video" autoplay playsinline></video>
@@ -32,63 +33,69 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let prevPoints = [];
-let velocities = [];
-let particles = [];
+let prev = [];
+let rotation = 0;
 
+// Smooth function
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
-function createParticle(x, y, vx, vy, color) {
-  particles.push({ x, y, vx, vy, life: 1, color });
-}
-
-function drawParticles() {
-  particles.forEach(p => {
-    p.x += p.vx;
-    p.y += p.vy;
-    p.life -= 0.02;
-
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(${p.color}, ${p.life})`;
-    ctx.fill();
-  });
-
-  particles = particles.filter(p => p.life > 0);
-}
-
-function drawLine(p1, p2, speed) {
-  const dx = p2.x - p1.x;
-  const dy = p2.y - p1.y;
-
-  const cx = (p1.x + p2.x)/2 + dy * 0.1;
-  const cy = (p1.y + p2.y)/2 - dx * 0.1;
-
-  const hue = 200 + speed * 100;
-  const color = `hsl(${hue}, 100%, 60%)`;
-
+// Draw clean elastic string
+function drawString(p1, p2) {
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
+
+  const cx = (p1.x + p2.x) / 2;
+  const cy = (p1.y + p2.y) / 2;
+
   ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
 
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 2 + speed * 5;
-  ctx.shadowBlur = 25;
-  ctx.shadowColor = color;
+  ctx.strokeStyle = "rgba(0,255,100,0.9)";
+  ctx.lineWidth = 4;
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = "lime";
 
   ctx.stroke();
+}
 
-  // Particle flow
-  for (let i = 0; i < 2; i++) {
-    createParticle(
-      (p1.x + p2.x)/2,
-      (p1.y + p2.y)/2,
-      dx * 0.01 * Math.random(),
-      dy * 0.01 * Math.random(),
-      `0,200,255`
+// Draw wireframe globe
+function drawGlobe(centerX, centerY, radius) {
+  ctx.strokeStyle = "rgba(0,255,200,0.8)";
+  ctx.lineWidth = 1.5;
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = "cyan";
+
+  for (let i = 0; i < 10; i++) {
+    const angle = i * Math.PI / 10 + rotation;
+
+    ctx.beginPath();
+    ctx.ellipse(
+      centerX,
+      centerY,
+      radius,
+      radius * Math.cos(angle),
+      0,
+      0,
+      Math.PI * 2
     );
+    ctx.stroke();
+  }
+
+  for (let i = 0; i < 10; i++) {
+    const angle = i * Math.PI / 10 + rotation;
+
+    ctx.beginPath();
+    ctx.ellipse(
+      centerX,
+      centerY,
+      radius * Math.cos(angle),
+      radius,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.stroke();
   }
 }
 
@@ -104,56 +111,41 @@ hands.setOptions({
 });
 
 hands.onResults(results => {
-  ctx.fillStyle = "rgba(0,0,0,0.15)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  drawParticles();
+  if (!results.multiHandLandmarks || results.multiHandLandmarks.length < 2) return;
 
-  if (!results.multiHandLandmarks) return;
+  const hand1 = results.multiHandLandmarks[0];
+  const hand2 = results.multiHandLandmarks[1];
 
-  let currentPoints = [];
-
-  results.multiHandLandmarks.forEach((landmarks, handIndex) => {
-    const tips = [4, 8, 12, 16, 20];
-
-    tips.forEach((i, idx) => {
-      const x = (1 - landmarks[i].x) * canvas.width;
-      const y = landmarks[i].y * canvas.height;
-
-      const index = handIndex * 5 + idx;
-
-      if (!prevPoints[index]) {
-        prevPoints[index] = {x, y};
-        velocities[index] = {x:0, y:0};
-      }
-
-      let px = lerp(prevPoints[index].x, x, 0.35);
-      let py = lerp(prevPoints[index].y, y, 0.35);
-
-      velocities[index].x = (px - prevPoints[index].x) * 0.6;
-      velocities[index].y = (py - prevPoints[index].y) * 0.6;
-
-      px += velocities[index].x;
-      py += velocities[index].y;
-
-      currentPoints[index] = {x: px, y: py};
-      prevPoints[index] = {x: px, y: py};
-    });
+  const getPoint = (hand, i) => ({
+    x: (1 - hand[i].x) * canvas.width,
+    y: hand[i].y * canvas.height
   });
 
-  for (let i = 0; i < currentPoints.length; i++) {
-    for (let j = i + 1; j < currentPoints.length; j++) {
-      if (!currentPoints[i] || !currentPoints[j]) continue;
+  const p1 = getPoint(hand1, 8); // index finger
+  const p2 = getPoint(hand2, 8);
 
-      const dx = currentPoints[i].x - currentPoints[j].x;
-      const dy = currentPoints[i].y - currentPoints[j].y;
-      const dist = Math.sqrt(dx*dx + dy*dy);
+  const thumb1 = getPoint(hand1, 4);
+  const thumb2 = getPoint(hand2, 4);
 
-      if (dist < 220) {
-        const speed = Math.min(dist / 220, 1);
-        drawLine(currentPoints[i], currentPoints[j], speed);
-      }
-    }
+  const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+
+  // MODE SWITCH
+  if (dist > 150) {
+    // STRING MODE
+    drawString(p1, p2);
+    drawString(thumb1, thumb2);
+  } else {
+    // GLOBE MODE
+    const cx = (p1.x + p2.x) / 2;
+    const cy = (p1.y + p2.y) / 2;
+
+    const radius = dist * 0.8;
+
+    rotation += 0.02 + (p1.x - p2.x) * 0.0001;
+
+    drawGlobe(cx, cy, radius);
   }
 });
 
