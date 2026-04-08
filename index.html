@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Minimal Digital Threads</title>
+  <title>Neon Digital Threads</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -33,6 +33,14 @@ canvas.height = window.innerHeight;
 let digits = [];
 let shapes = [];
 let prevPoints = {};
+
+// Neon palette
+const neonColors = [
+  "rgba(255,0,150,0.9)", // pink
+  "rgba(180,0,255,0.9)", // purple
+  "rgba(0,200,255,0.9)", // blue
+  "rgba(0,255,180,0.9)"  // green
+];
 
 // Helper
 function getPoint(hand, i) {
@@ -68,7 +76,7 @@ function drawDigits() {
   digits = digits.filter(d => d.life > 0);
 }
 
-// 🔷 POLYGON DRAWER
+// POLYGON
 function drawPolygon(x, y, sides, size, opacity) {
   ctx.beginPath();
   for (let i = 0; i < sides; i++) {
@@ -85,30 +93,28 @@ function drawPolygon(x, y, sides, size, opacity) {
   ctx.stroke();
 }
 
-// GEOMETRY
+// SHAPES
 function createShape(x, y) {
   shapes.push({
     x, y,
     size: 15 + Math.random()*25,
     life: 1,
-    type: Math.floor(Math.random()*7) // 0–6
+    type: Math.floor(Math.random()*7)
   });
 }
 
 function drawShapes() {
   shapes.forEach(s => {
     s.life -= 0.01;
-
     let opacity = s.life * 0.3;
 
-    if (s.type === 0) drawPolygon(s.x, s.y, 3, s.size, opacity); // triangle
-    else if (s.type === 1) drawPolygon(s.x, s.y, 4, s.size, opacity); // square
-    else if (s.type === 2) drawPolygon(s.x, s.y, 5, s.size, opacity); // pentagon
-    else if (s.type === 3) drawPolygon(s.x, s.y, 6, s.size, opacity); // hexagon
-    else if (s.type === 4) drawPolygon(s.x, s.y, 7, s.size, opacity); // heptagon
-    else if (s.type === 5) drawPolygon(s.x, s.y, 8, s.size, opacity); // octagon
+    if (s.type === 0) drawPolygon(s.x, s.y, 3, s.size, opacity);
+    else if (s.type === 1) drawPolygon(s.x, s.y, 4, s.size, opacity);
+    else if (s.type === 2) drawPolygon(s.x, s.y, 5, s.size, opacity);
+    else if (s.type === 3) drawPolygon(s.x, s.y, 6, s.size, opacity);
+    else if (s.type === 4) drawPolygon(s.x, s.y, 7, s.size, opacity);
+    else if (s.type === 5) drawPolygon(s.x, s.y, 8, s.size, opacity);
     else {
-      // circle
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
       ctx.strokeStyle = `rgba(255,255,255,${opacity})`;
@@ -121,8 +127,8 @@ function drawShapes() {
 
 // LINE
 function drawLine(p1, p2, i) {
-  const cx = (p1.x + p2.x) / 2;
-  const cy = (p1.y + p2.y) / 2;
+  const cx = (p1.x + p2.x)/2;
+  const cy = (p1.y + p2.y)/2;
 
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
@@ -134,15 +140,12 @@ function drawLine(p1, p2, i) {
     p2.y
   );
 
-  const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
-  gradient.addColorStop(0, "rgba(255,0,150,0.9)");
-  gradient.addColorStop(0.5, "rgba(150,0,255,0.9)");
-  gradient.addColorStop(1, "rgba(0,150,255,0.9)");
+  const color = neonColors[i % neonColors.length];
 
-  ctx.strokeStyle = gradient;
+  ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
-  ctx.shadowBlur = 10;
-  ctx.shadowColor = "purple";
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = color;
 
   ctx.stroke();
 }
@@ -186,23 +189,17 @@ hands.onResults(results => {
     });
   });
 
-  // crisscross
+  // 🔀 DENSE CRISSCROSS
   if (handsData.length >= 2) {
     const hand1 = handsData[0];
     const hand2 = handsData[1];
 
-    const mapping = [
-      [4,12],
-      [8,16],
-      [12,20],
-      [16,8],
-      [20,4]
-    ];
-
-    mapping.forEach((pair, i) => {
-      const p1 = getPoint(hand1, pair[0]);
-      const p2 = getPoint(hand2, pair[1]);
-      drawLine(p1, p2, i);
+    fingers.forEach((f1, i) => {
+      fingers.forEach((f2, j) => {
+        if (i !== j) { // avoid straight mapping
+          drawLine(getPoint(hand1, f1), getPoint(hand2, f2), i+j);
+        }
+      });
     });
   }
 });
