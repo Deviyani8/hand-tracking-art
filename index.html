@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Advanced Hand Interaction</title>
+  <title>Premium Hand Interaction</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -32,8 +32,9 @@ canvas.height = window.innerHeight;
 
 let prevCenterX = 0;
 let rotation = 0;
+let particles = [];
 
-// Get point
+// Point helper
 function getPoint(hand, i) {
   return {
     x: (1 - hand[i].x) * canvas.width,
@@ -41,7 +42,32 @@ function getPoint(hand, i) {
   };
 }
 
-// Draw multiple strings
+// Particles
+function createParticle(x, y) {
+  particles.push({
+    x, y,
+    vx: (Math.random()-0.5)*1.5,
+    vy: (Math.random()-0.5)*1.5,
+    life: 1
+  });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.01;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(0,255,200,${p.life})`;
+    ctx.fill();
+  });
+
+  particles = particles.filter(p => p.life > 0);
+}
+
+// Strings
 function drawBands(hand1, hand2) {
   const fingers = [4, 8, 12, 16, 20];
 
@@ -49,40 +75,47 @@ function drawBands(hand1, hand2) {
     const p1 = getPoint(hand1, f);
     const p2 = getPoint(hand2, f);
 
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-
     const cx = (p1.x + p2.x)/2;
     const cy = (p1.y + p2.y)/2;
 
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
     ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
 
-    ctx.strokeStyle = `rgba(0,255,120,${0.6 + i*0.1})`;
+    ctx.strokeStyle = `hsl(${120 + i*20}, 100%, 60%)`;
     ctx.lineWidth = 2 + i;
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 15;
     ctx.shadowColor = "lime";
 
     ctx.stroke();
+
+    // particles on strings
+    createParticle(cx, cy);
   });
 }
 
-// Draw globe
+// Globe
 function drawGlobe(cx, cy, r) {
   ctx.strokeStyle = "rgba(0,255,200,0.9)";
   ctx.lineWidth = 1.2;
-  ctx.shadowBlur = 15;
+  ctx.shadowBlur = 20;
   ctx.shadowColor = "cyan";
 
-  for (let i = 0; i < 12; i++) {
-    const angle = i * Math.PI / 12 + rotation;
+  for (let i = 0; i < 14; i++) {
+    const angle = i * Math.PI / 14 + rotation;
 
     ctx.beginPath();
-    ctx.ellipse(cx, cy, r, r * Math.cos(angle), 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, r, r*Math.cos(angle), 0, 0, Math.PI*2);
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.ellipse(cx, cy, r * Math.cos(angle), r, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, r*Math.cos(angle), r, 0, 0, Math.PI*2);
     ctx.stroke();
+  }
+
+  // particles around globe
+  for (let i = 0; i < 3; i++) {
+    createParticle(cx + (Math.random()-0.5)*r, cy + (Math.random()-0.5)*r);
   }
 }
 
@@ -99,6 +132,7 @@ hands.setOptions({
 
 hands.onResults(results => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawParticles();
 
   if (!results.multiHandLandmarks || results.multiHandLandmarks.length < 2) return;
 
@@ -113,9 +147,9 @@ hands.onResults(results => {
 
   const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
 
-  // Rotation based on movement
+  // better rotation
   let velocity = cx - prevCenterX;
-  rotation += velocity * 0.01;
+  rotation += velocity * 0.02;
   prevCenterX = cx;
 
   if (dist > 180) {
