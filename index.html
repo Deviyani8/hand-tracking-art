@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Premium Hand Interaction</title>
+  <title>Smooth Hand Interaction</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -32,9 +32,11 @@ canvas.height = window.innerHeight;
 
 let prevCenterX = 0;
 let rotation = 0;
+let rotationVelocity = 0;
+let isGlobeMode = false;
 let particles = [];
 
-// Point helper
+// Get point
 function getPoint(hand, i) {
   return {
     x: (1 - hand[i].x) * canvas.width,
@@ -46,8 +48,8 @@ function getPoint(hand, i) {
 function createParticle(x, y) {
   particles.push({
     x, y,
-    vx: (Math.random()-0.5)*1.5,
-    vy: (Math.random()-0.5)*1.5,
+    vx: (Math.random()-0.5)*1.2,
+    vy: (Math.random()-0.5)*1.2,
     life: 1
   });
 }
@@ -56,7 +58,7 @@ function drawParticles() {
   particles.forEach(p => {
     p.x += p.vx;
     p.y += p.vy;
-    p.life -= 0.01;
+    p.life -= 0.015;
 
     ctx.beginPath();
     ctx.arc(p.x, p.y, 2, 0, Math.PI*2);
@@ -82,14 +84,13 @@ function drawBands(hand1, hand2) {
     ctx.moveTo(p1.x, p1.y);
     ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
 
-    ctx.strokeStyle = `hsl(${120 + i*20}, 100%, 60%)`;
+    ctx.strokeStyle = `hsl(${120 + i*25}, 100%, 60%)`;
     ctx.lineWidth = 2 + i;
     ctx.shadowBlur = 15;
     ctx.shadowColor = "lime";
 
     ctx.stroke();
 
-    // particles on strings
     createParticle(cx, cy);
   });
 }
@@ -147,12 +148,21 @@ hands.onResults(results => {
 
   const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
 
-  // better rotation
+  // Smooth mode switching
+  if (dist < 160) {
+    isGlobeMode = true;
+  } else if (dist > 200) {
+    isGlobeMode = false;
+  }
+
+  // Rotation with momentum
   let velocity = cx - prevCenterX;
-  rotation += velocity * 0.02;
+  rotationVelocity = rotationVelocity * 0.9 + velocity * 0.02;
+  rotation += rotationVelocity;
+
   prevCenterX = cx;
 
-  if (dist > 180) {
+  if (!isGlobeMode) {
     drawBands(hand1, hand2);
   } else {
     drawGlobe(cx, cy, dist * 0.9);
