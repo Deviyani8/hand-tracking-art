@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Digital Silk - Crisscross</title>
+  <title>Digital Fabric System</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -31,7 +31,8 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 let digits = [];
-let prevPoints = {};
+let prevPoints = [];
+let shapes = [];
 
 // Helper
 function getPoint(hand, i) {
@@ -41,14 +42,14 @@ function getPoint(hand, i) {
   };
 }
 
-// Digit particles
+// DIGITS
 function createDigit(x, y, intensity) {
   digits.push({
     x, y,
-    vx: (Math.random()-0.5) * 0.8,
-    vy: (Math.random()-0.5) * 0.8,
+    vx: (Math.random()-0.5)*0.8,
+    vy: (Math.random()-0.5)*0.8,
     life: 1,
-    size: 6 + intensity * 4,
+    size: 5 + intensity*2,
     value: Math.floor(Math.random()*10)
   });
 }
@@ -57,7 +58,7 @@ function drawDigits() {
   digits.forEach(d => {
     d.x += d.vx;
     d.y += d.vy;
-    d.life -= 0.015;
+    d.life -= 0.02;
 
     ctx.fillStyle = `rgba(255,255,255,${d.life})`;
     ctx.font = `${d.size}px monospace`;
@@ -67,14 +68,54 @@ function drawDigits() {
   digits = digits.filter(d => d.life > 0);
 }
 
-// CRISSCROSS strings
-function drawCrisscross(p1, p2, index) {
+// GEOMETRIC BACKGROUND
+function createShape(x, y) {
+  shapes.push({
+    x, y,
+    size: 20 + Math.random()*40,
+    life: 1,
+    type: Math.random()
+  });
+}
+
+function drawShapes() {
+  shapes.forEach(s => {
+    s.life -= 0.01;
+
+    ctx.strokeStyle = `rgba(255,255,255,${s.life * 0.3})`;
+    ctx.lineWidth = 1;
+
+    if (s.type < 0.33) {
+      // triangle
+      ctx.beginPath();
+      ctx.moveTo(s.x, s.y - s.size);
+      ctx.lineTo(s.x - s.size, s.y + s.size);
+      ctx.lineTo(s.x + s.size, s.y + s.size);
+      ctx.closePath();
+      ctx.stroke();
+    } else if (s.type < 0.66) {
+      // circle
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size, 0, Math.PI*2);
+      ctx.stroke();
+    } else {
+      // lines
+      ctx.beginPath();
+      ctx.moveTo(s.x - s.size, s.y);
+      ctx.lineTo(s.x + s.size, s.y);
+      ctx.stroke();
+    }
+  });
+
+  shapes = shapes.filter(s => s.life > 0);
+}
+
+// CRISSCROSS CONNECTION
+function drawCrisscross(p1, p2, offsetSeed) {
   const strands = 6;
 
   for (let s = 0; s < strands; s++) {
     ctx.beginPath();
-
-    const offset = (s - strands/2) * 5;
 
     const steps = 20;
 
@@ -82,22 +123,20 @@ function drawCrisscross(p1, p2, index) {
       let x = p1.x + (p2.x - p1.x) * t;
       let y = p1.y + (p2.y - p1.y) * t;
 
-      // cross wave
       y += Math.sin(t * Math.PI * 6 + Date.now()*0.006 + s) * 10;
-      x += Math.cos(t * Math.PI * 4 + s) * offset;
+      x += Math.cos(t * Math.PI * 4 + s + offsetSeed) * 10;
 
       if (t === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
 
-    // gradient
     const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
     gradient.addColorStop(0, "rgba(255,0,150,0.8)");
     gradient.addColorStop(0.5, "rgba(150,0,255,0.8)");
     gradient.addColorStop(1, "rgba(0,150,255,0.8)");
 
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 0.8 + s * 0.15;
+    ctx.lineWidth = 0.8 + s*0.15;
     ctx.shadowBlur = 6;
     ctx.shadowColor = "purple";
 
@@ -118,43 +157,50 @@ hands.setOptions({
 
 hands.onResults(results => {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
   drawDigits();
+  drawShapes();
 
   if (!results.multiHandLandmarks) return;
 
   const handsData = results.multiHandLandmarks;
   const fingers = [4, 8, 12, 16, 20];
 
-  handsData.forEach((hand, hIndex) => {
-
-    fingers.forEach((f, i) => {
+  // MOTION DETECTION
+  handsData.forEach((hand, hi) => {
+    fingers.forEach(f => {
       const p = getPoint(hand, f);
 
-      // velocity detection
-      const key = hIndex + "_" + f;
-      let prev = prevPoints[key] || p;
+      let prev = prevPoints[hi+"_"+f] || p;
+      let speed = Math.hypot(p.x-prev.x, p.y-prev.y);
 
-      let dx = p.x - prev.x;
-      let dy = p.y - prev.y;
-
-      let speed = Math.sqrt(dx*dx + dy*dy);
-
-      // create digits on high motion
-      if (speed > 8 && Math.random() < 0.5) {
-        createDigit(p.x, p.y, speed * 0.05);
+      if (speed > 6) {
+        if (Math.random() < 0.4) createDigit(p.x, p.y, speed*0.05);
+        if (Math.random() < 0.1) createShape(p.x, p.y);
       }
 
-      prevPoints[key] = p;
+      prevPoints[hi+"_"+f] = p;
     });
   });
 
-  // Draw connections if 2 hands
+  // CRISSCROSS mapping (DIFFERENT fingers)
   if (handsData.length >= 2) {
     const hand1 = handsData[0];
     const hand2 = handsData[1];
 
-    fingers.forEach((f, i) => {
-      drawCrisscross(getPoint(hand1, f), getPoint(hand2, f), i);
+    const mapping = [
+      [4,12],  // thumb → middle
+      [8,16],  // index → ring
+      [12,20], // middle → pinky
+      [16,8],  // ring → index
+      [20,4]   // pinky → thumb
+    ];
+
+    mapping.forEach((pair, i) => {
+      const p1 = getPoint(hand1, pair[0]);
+      const p2 = getPoint(hand2, pair[1]);
+
+      drawCrisscross(p1, p2, i);
     });
   }
 });
