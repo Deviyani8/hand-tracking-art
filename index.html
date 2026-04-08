@@ -1,30 +1,21 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Anti-Gravity Hand Interaction</title>
+  <title>Enhanced Anti-Gravity Interaction</title>
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: black;
-    }
+    body { margin: 0; overflow: hidden; background: black; }
     video {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
+      width: 100vw; height: 100vh;
       object-fit: cover;
       transform: scaleX(-1);
     }
     canvas {
       position: absolute;
-      top: 0;
-      left: 0;
+      top: 0; left: 0;
     }
   </style>
 </head>
-
 <body>
 
 <video id="video" autoplay playsinline></video>
@@ -43,35 +34,66 @@ canvas.height = window.innerHeight;
 
 let prevPoints = [];
 let velocities = [];
+let particles = [];
 
 function lerp(a, b, t) {
   return a + (b - a) * t;
+}
+
+function createParticle(x, y, vx, vy, color) {
+  particles.push({ x, y, vx, vy, life: 1, color });
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 0.02;
+
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${p.color}, ${p.life})`;
+    ctx.fill();
+  });
+
+  particles = particles.filter(p => p.life > 0);
 }
 
 function drawLine(p1, p2, speed) {
   const dx = p2.x - p1.x;
   const dy = p2.y - p1.y;
 
-  ctx.beginPath();
-  ctx.moveTo(p1.x, p1.y);
-
   const cx = (p1.x + p2.x)/2 + dy * 0.1;
   const cy = (p1.y + p2.y)/2 - dx * 0.1;
 
+  const hue = 200 + speed * 100;
+  const color = `hsl(${hue}, 100%, 60%)`;
+
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
   ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
 
-  ctx.strokeStyle = `rgba(0, 200, 255, ${0.3 + speed * 2})`;
-  ctx.lineWidth = 2 + speed * 4;
-  ctx.shadowBlur = 20;
-  ctx.shadowColor = 'cyan';
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2 + speed * 5;
+  ctx.shadowBlur = 25;
+  ctx.shadowColor = color;
 
   ctx.stroke();
+
+  // Particle flow
+  for (let i = 0; i < 2; i++) {
+    createParticle(
+      (p1.x + p2.x)/2,
+      (p1.y + p2.y)/2,
+      dx * 0.01 * Math.random(),
+      dy * 0.01 * Math.random(),
+      `0,200,255`
+    );
+  }
 }
 
 const hands = new Hands({
-  locateFile: (file) => {
-    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-  }
+  locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
 });
 
 hands.setOptions({
@@ -82,16 +104,19 @@ hands.setOptions({
 });
 
 hands.onResults(results => {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(0,0,0,0.15)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawParticles();
 
   if (!results.multiHandLandmarks) return;
 
   let currentPoints = [];
 
   results.multiHandLandmarks.forEach((landmarks, handIndex) => {
-    const fingertipIndices = [4, 8, 12, 16, 20];
+    const tips = [4, 8, 12, 16, 20];
 
-    fingertipIndices.forEach((i, idx) => {
+    tips.forEach((i, idx) => {
       const x = (1 - landmarks[i].x) * canvas.width;
       const y = landmarks[i].y * canvas.height;
 
@@ -102,11 +127,11 @@ hands.onResults(results => {
         velocities[index] = {x:0, y:0};
       }
 
-      let px = lerp(prevPoints[index].x, x, 0.4);
-      let py = lerp(prevPoints[index].y, y, 0.4);
+      let px = lerp(prevPoints[index].x, x, 0.35);
+      let py = lerp(prevPoints[index].y, y, 0.35);
 
-      velocities[index].x = (px - prevPoints[index].x) * 0.5;
-      velocities[index].y = (py - prevPoints[index].y) * 0.5;
+      velocities[index].x = (px - prevPoints[index].x) * 0.6;
+      velocities[index].y = (py - prevPoints[index].y) * 0.6;
 
       px += velocities[index].x;
       py += velocities[index].y;
@@ -124,8 +149,8 @@ hands.onResults(results => {
       const dy = currentPoints[i].y - currentPoints[j].y;
       const dist = Math.sqrt(dx*dx + dy*dy);
 
-      if (dist < 200) {
-        const speed = Math.min(dist / 200, 1);
+      if (dist < 220) {
+        const speed = Math.min(dist / 220, 1);
         drawLine(currentPoints[i], currentPoints[j], speed);
       }
     }
