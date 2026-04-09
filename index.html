@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Neon Threads - Ultra Crisscross</title>
+  <title>Neon Threads - Final Experience</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -43,18 +43,18 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// AUDIO
+// AUDIO (FIXED)
 let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-let osc = audioCtx.createOscillator();
-let gain = audioCtx.createGain();
+let oscillator = audioCtx.createOscillator();
+let gainNode = audioCtx.createGain();
 
-osc.type = "sine";
-osc.frequency.value = 200;
-gain.gain.value = 0;
+oscillator.type = "sine";
+oscillator.frequency.value = 200;
+gainNode.gain.value = 0;
 
-osc.connect(gain);
-gain.connect(audioCtx.destination);
-osc.start();
+oscillator.connect(gainNode);
+gainNode.connect(audioCtx.destination);
+oscillator.start();
 
 document.body.addEventListener("click", () => {
   audioCtx.resume();
@@ -75,6 +75,7 @@ const colors = [
   "rgba(0,255,180,1)"
 ];
 
+// helpers
 function lerp(a,b,t){ return a+(b-a)*t; }
 
 function getPoint(hand,i,key){
@@ -159,7 +160,7 @@ function drawShapes(){
   shapes=shapes.filter(s=>s.life>0);
 }
 
-// FLARES
+// FLARES (ENHANCED)
 function createFlare(x,y){
   flares.push({
     x,y,
@@ -174,23 +175,28 @@ function drawFlares(){
 
     const g=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.size);
     g.addColorStop(0,`rgba(255,220,100,${f.life*0.7})`);
+    g.addColorStop(0.4,`rgba(255,180,50,${f.life*0.4})`);
     g.addColorStop(1,"rgba(255,150,0,0)");
 
     ctx.fillStyle=g;
     ctx.beginPath();
     ctx.arc(f.x,f.y,f.size,0,Math.PI*2);
     ctx.fill();
+
+    // bright core
+    ctx.beginPath();
+    ctx.arc(f.x,f.y,2,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,200,${f.life})`;
+    ctx.fill();
   });
 
   flares=flares.filter(f=>f.life>0);
 }
 
-// 🔀 ULTRA CRISSCROSS LINE
+// LINES
 function drawLine(p1,p2,i){
-  const randomness = (Math.random() - 0.5) * 40;
-
-  const cx=(p1.x+p2.x)/2 + Math.sin(Date.now()*0.002+i)*20 + randomness;
-  const cy=(p1.y+p2.y)/2 + Math.cos(Date.now()*0.002+i)*20 - randomness;
+  const cx=(p1.x+p2.x)/2 + Math.sin(Date.now()*0.002+i)*10;
+  const cy=(p1.y+p2.y)/2 + Math.cos(Date.now()*0.002+i)*10;
 
   ctx.beginPath();
   ctx.moveTo(p1.x,p1.y);
@@ -199,4 +205,86 @@ function drawLine(p1,p2,i){
   const color=colors[i%colors.length].replace("1)", "0.8)");
 
   ctx.strokeStyle=color;
-  ctx.lineWidth=
+  ctx.lineWidth=1.5;
+  ctx.shadowBlur=12;
+  ctx.shadowColor=color;
+
+  ctx.stroke();
+}
+
+// HANDS
+const hands=new Hands({
+  locateFile:file=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+});
+
+hands.setOptions({
+  maxNumHands:2,
+  modelComplexity:1,
+  minDetectionConfidence:0.7,
+  minTrackingConfidence:0.7
+});
+
+hands.onResults(results=>{
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  drawDigits();
+  drawShapes();
+  drawFlares();
+
+  if(!results.multiHandLandmarks)return;
+
+  const handsData=results.multiHandLandmarks;
+  const fingers=[4,8,12,16,20];
+
+  let totalSpeed=0;
+
+  handsData.forEach((hand,hi)=>{
+    fingers.forEach(f=>{
+      const p=getPoint(hand,f,hi+"_"+f);
+
+      let prev=prevPoints["raw_"+hi+"_"+f]||p;
+      let speed=Math.hypot(p.x-prev.x,p.y-prev.y);
+
+      totalSpeed+=speed;
+
+      if(speed>6){
+        if(Math.random()<0.4)createDigit(p.x,p.y);
+        if(Math.random()<0.08)createShape(p.x,p.y);
+        if(Math.random()<0.1)createFlare(p.x,p.y);
+      }
+
+      prevPoints["raw_"+hi+"_"+f]=p;
+    });
+  });
+
+  // 🔊 SOUND (NOW NOTICEABLE)
+  energy = lerp(energy, totalSpeed * 0.02, 0.2);
+
+  gainNode.gain.value = Math.min(0.25, energy);
+  oscillator.frequency.value = 200 + energy * 600;
+
+  if(handsData.length>=2){
+    const h1=handsData[0];
+    const h2=handsData[1];
+
+    fingers.forEach((f1,i)=>{
+      fingers.forEach((f2,j)=>{
+        if(i!==j){
+          drawLine(getPoint(h1,f1,"a"+i), getPoint(h2,f2,"b"+j), i+j);
+        }
+      });
+    });
+  }
+});
+
+const camera=new Camera(video,{
+  onFrame:async()=>{await hands.send({image:video});},
+  width:1280,
+  height:720
+});
+
+camera.start();
+</script>
+
+</body>
+</html>
