@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Neon Digital Threads - Final</title>
+  <title>Neon Digital Threads - Final Polished</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -32,6 +32,7 @@ canvas.height = window.innerHeight;
 
 let digits = [];
 let shapes = [];
+let flares = [];
 let prevPoints = {};
 
 const neonColors = [
@@ -131,29 +132,50 @@ function drawShapes() {
   shapes = shapes.filter(s => s.life > 0);
 }
 
-// LINE (final finesse)
+// ✨ FLARES
+function createFlare(x, y) {
+  flares.push({
+    x, y,
+    size: 10 + Math.random()*20,
+    life: 1
+  });
+}
+
+function drawFlares() {
+  flares.forEach(f => {
+    f.life -= 0.02;
+
+    const gradient = ctx.createRadialGradient(
+      f.x, f.y, 0,
+      f.x, f.y, f.size
+    );
+
+    gradient.addColorStop(0, `rgba(255,215,0,${f.life * 0.4})`);
+    gradient.addColorStop(1, `rgba(255,215,0,0)`);
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, f.size, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  flares = flares.filter(f => f.life > 0);
+}
+
+// LINE (fixed consistency)
 function drawLine(p1, p2, i) {
-  const dx = p2.x - p1.x;
-  const dy = p2.y - p1.y;
-  const dist = Math.sqrt(dx*dx + dy*dy);
-
-  // depth
-  const alpha = Math.max(0.2, 1 - dist / 600);
-  const width = 0.8 + (1 - dist/600) * 2;
-
-  // tension curve
-  const cx = (p1.x + p2.x)/2 + Math.sin(Date.now()*0.002 + i) * (dist * 0.1);
-  const cy = (p1.y + p2.y)/2 + Math.cos(Date.now()*0.002 + i) * (dist * 0.1);
+  const cx = (p1.x + p2.x)/2 + Math.sin(Date.now()*0.002 + i) * 15;
+  const cy = (p1.y + p2.y)/2 + Math.cos(Date.now()*0.002 + i) * 15;
 
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
   ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
 
-  const color = neonColors[i % neonColors.length].replace("1)", `${alpha})`);
+  const color = neonColors[i % neonColors.length].replace("1)", "0.7)");
 
   ctx.strokeStyle = color;
-  ctx.lineWidth = width;
-  ctx.shadowBlur = 15 * alpha;
+  ctx.lineWidth = 1.5;
+  ctx.shadowBlur = 12;
   ctx.shadowColor = color;
 
   ctx.stroke();
@@ -175,6 +197,7 @@ hands.onResults(results => {
 
   drawDigits();
   drawShapes();
+  drawFlares();
 
   if (!results.multiHandLandmarks) return;
 
@@ -191,6 +214,7 @@ hands.onResults(results => {
       if (speed > 6) {
         if (Math.random()<0.4) createDigit(p.x,p.y);
         if (Math.random()<0.08) createShape(p.x,p.y);
+        if (Math.random()<0.05) createFlare(p.x,p.y);
       }
 
       prevPoints["raw_"+hi+"_"+f] = p;
