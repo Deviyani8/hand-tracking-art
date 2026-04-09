@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Neon Threads - Final Experience</title>
+  <title>Neon Threads - Stable Crisscross</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -43,18 +43,18 @@ const ctx = canvas.getContext('2d');
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// AUDIO (FIXED)
+// AUDIO
 let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-let oscillator = audioCtx.createOscillator();
-let gainNode = audioCtx.createGain();
+let osc = audioCtx.createOscillator();
+let gain = audioCtx.createGain();
 
-oscillator.type = "sine";
-oscillator.frequency.value = 200;
-gainNode.gain.value = 0;
+osc.type = "sine";
+osc.frequency.value = 200;
+gain.gain.value = 0;
 
-oscillator.connect(gainNode);
-gainNode.connect(audioCtx.destination);
-oscillator.start();
+osc.connect(gain);
+gain.connect(audioCtx.destination);
+osc.start();
 
 document.body.addEventListener("click", () => {
   audioCtx.resume();
@@ -75,7 +75,6 @@ const colors = [
   "rgba(0,255,180,1)"
 ];
 
-// helpers
 function lerp(a,b,t){ return a+(b-a)*t; }
 
 function getPoint(hand,i,key){
@@ -160,7 +159,7 @@ function drawShapes(){
   shapes=shapes.filter(s=>s.life>0);
 }
 
-// FLARES (ENHANCED)
+// FLARES
 function createFlare(x,y){
   flares.push({
     x,y,
@@ -175,25 +174,18 @@ function drawFlares(){
 
     const g=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,f.size);
     g.addColorStop(0,`rgba(255,220,100,${f.life*0.7})`);
-    g.addColorStop(0.4,`rgba(255,180,50,${f.life*0.4})`);
     g.addColorStop(1,"rgba(255,150,0,0)");
 
     ctx.fillStyle=g;
     ctx.beginPath();
     ctx.arc(f.x,f.y,f.size,0,Math.PI*2);
     ctx.fill();
-
-    // bright core
-    ctx.beginPath();
-    ctx.arc(f.x,f.y,2,0,Math.PI*2);
-    ctx.fillStyle=`rgba(255,255,200,${f.life})`;
-    ctx.fill();
   });
 
   flares=flares.filter(f=>f.life>0);
 }
 
-// LINES
+// LINE
 function drawLine(p1,p2,i){
   const cx=(p1.x+p2.x)/2 + Math.sin(Date.now()*0.002+i)*10;
   const cy=(p1.y+p2.y)/2 + Math.cos(Date.now()*0.002+i)*10;
@@ -257,12 +249,12 @@ hands.onResults(results=>{
     });
   });
 
-  // 🔊 SOUND (NOW NOTICEABLE)
+  // SOUND
   energy = lerp(energy, totalSpeed * 0.02, 0.2);
+  gain.gain.value = Math.min(0.25, energy);
+  osc.frequency.value = 200 + energy * 600;
 
-  gainNode.gain.value = Math.min(0.25, energy);
-  oscillator.frequency.value = 200 + energy * 600;
-
+  // 🔀 SAFE CRISSCROSS (more dense but stable)
   if(handsData.length>=2){
     const h1=handsData[0];
     const h2=handsData[1];
@@ -271,6 +263,11 @@ hands.onResults(results=>{
       fingers.forEach((f2,j)=>{
         if(i!==j){
           drawLine(getPoint(h1,f1,"a"+i), getPoint(h2,f2,"b"+j), i+j);
+
+          // extra diagonal layer
+          if((i+j)%2===0){
+            drawLine(getPoint(h1,f1,"a"+i), getPoint(h2,fingers[(j+2)%5],"b"+j), i+j+10);
+          }
         }
       });
     });
