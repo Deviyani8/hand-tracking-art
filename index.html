@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Neon Digital Threads - Final Polished</title>
+  <title>Neon Threads - Enhanced Experience</title>
   <style>
     body { margin: 0; overflow: hidden; background: black; }
     video {
@@ -42,12 +42,10 @@ const neonColors = [
   "rgba(0,255,180,1)"
 ];
 
-// smooth helper
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
 
-// smooth point
 function getPoint(hand, i, key) {
   const raw = {
     x: (1 - hand[i].x) * canvas.width,
@@ -69,10 +67,10 @@ function getPoint(hand, i, key) {
 function createDigit(x, y) {
   digits.push({
     x, y,
-    vx: (Math.random()-0.5)*0.5,
-    vy: (Math.random()-0.5)*0.5,
+    vx: (Math.random()-0.5)*0.6,
+    vy: (Math.random()-0.5)*0.6,
     life: 1,
-    size: 4,
+    size: 3,
     value: Math.floor(Math.random()*10)
   });
 }
@@ -109,7 +107,7 @@ function drawPolygon(x, y, sides, size, opacity) {
 function createShape(x, y) {
   shapes.push({
     x, y,
-    size: 15 + Math.random()*20,
+    size: 10 + Math.random()*25,
     life: 1,
     type: Math.floor(Math.random()*7)
   });
@@ -118,7 +116,7 @@ function createShape(x, y) {
 function drawShapes() {
   shapes.forEach(s => {
     s.life -= 0.01;
-    const o = s.life * 0.3;
+    const o = s.life * 0.25;
 
     if (s.type < 6) drawPolygon(s.x, s.y, s.type+3, s.size, o);
     else {
@@ -132,50 +130,62 @@ function drawShapes() {
   shapes = shapes.filter(s => s.life > 0);
 }
 
-// ✨ FLARES
+// ✨ PREMIUM FLARES
 function createFlare(x, y) {
   flares.push({
     x, y,
-    size: 10 + Math.random()*20,
-    life: 1
+    size: 20 + Math.random()*30,
+    life: 1,
+    pulse: Math.random()*Math.PI*2
   });
 }
 
 function drawFlares() {
   flares.forEach(f => {
     f.life -= 0.02;
+    f.pulse += 0.05;
 
+    const pulseSize = f.size + Math.sin(f.pulse) * 5;
+
+    // outer glow
     const gradient = ctx.createRadialGradient(
       f.x, f.y, 0,
-      f.x, f.y, f.size
+      f.x, f.y, pulseSize
     );
 
-    gradient.addColorStop(0, `rgba(255,215,0,${f.life * 0.4})`);
-    gradient.addColorStop(1, `rgba(255,215,0,0)`);
+    gradient.addColorStop(0, `rgba(255,220,120,${f.life * 0.4})`);
+    gradient.addColorStop(0.4, `rgba(255,180,60,${f.life * 0.2})`);
+    gradient.addColorStop(1, `rgba(255,150,0,0)`);
 
     ctx.fillStyle = gradient;
     ctx.beginPath();
-    ctx.arc(f.x, f.y, f.size, 0, Math.PI*2);
+    ctx.arc(f.x, f.y, pulseSize, 0, Math.PI*2);
+    ctx.fill();
+
+    // bright core
+    ctx.beginPath();
+    ctx.arc(f.x, f.y, 2, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,240,180,${f.life})`;
     ctx.fill();
   });
 
   flares = flares.filter(f => f.life > 0);
 }
 
-// LINE (fixed consistency)
-function drawLine(p1, p2, i) {
-  const cx = (p1.x + p2.x)/2 + Math.sin(Date.now()*0.002 + i) * 15;
-  const cy = (p1.y + p2.y)/2 + Math.cos(Date.now()*0.002 + i) * 15;
+// LINE (more layers)
+function drawLine(p1, p2, i, depth) {
+  const cx = (p1.x + p2.x)/2 + Math.sin(Date.now()*0.002 + i) * 10;
+  const cy = (p1.y + p2.y)/2 + Math.cos(Date.now()*0.002 + i) * 10;
 
   ctx.beginPath();
   ctx.moveTo(p1.x, p1.y);
   ctx.quadraticCurveTo(cx, cy, p2.x, p2.y);
 
-  const color = neonColors[i % neonColors.length].replace("1)", "0.7)");
+  const color = neonColors[i % neonColors.length].replace("1)", depth+")");
 
   ctx.strokeStyle = color;
-  ctx.lineWidth = 1.5;
-  ctx.shadowBlur = 12;
+  ctx.lineWidth = 1.2;
+  ctx.shadowBlur = 10;
   ctx.shadowColor = color;
 
   ctx.stroke();
@@ -214,7 +224,7 @@ hands.onResults(results => {
       if (speed > 6) {
         if (Math.random()<0.4) createDigit(p.x,p.y);
         if (Math.random()<0.08) createShape(p.x,p.y);
-        if (Math.random()<0.05) createFlare(p.x,p.y);
+        if (Math.random()<0.1) createFlare(p.x,p.y);
       }
 
       prevPoints["raw_"+hi+"_"+f] = p;
@@ -230,7 +240,14 @@ hands.onResults(results => {
         if(i!==j){
           const p1 = getPoint(h1,f1,"a"+i);
           const p2 = getPoint(h2,f2,"b"+j);
-          drawLine(p1,p2,i+j);
+
+          // foreground
+          drawLine(p1,p2,i+j,0.8);
+
+          // background (depth)
+          if (Math.random() < 0.3) {
+            drawLine(p1,p2,i+j,0.3);
+          }
         }
       });
     });
